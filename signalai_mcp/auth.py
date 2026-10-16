@@ -1,0 +1,78 @@
+import json
+from typing import Any
+
+import httpx
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+
+from signalai_mcp.config import settings
+
+
+class ConfiguredTokenVerifier(TokenVerifier):
+    """Verify bearer tokens through RFC 7662 or a deployment secret fallback."""
+
+    def __init__(self) -> None:
+        self._tokens = self._load_tokens()
+        self._client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+
+    @staticmethod
+    def _load_tokens() -> dict[str, dict[str, object]]:
+        if not settings.service_token:
+            return {}
+        try:
+            configured = json.loads(settings.service_token)
+        except json.JSONDecodeError:
+            return {
+                settings.service_token: {
+                    "client_id": "configured-client",
+                    "scopes": [settings.required_scope],
+                }
+            }
+        return configured if isinstance(configured, dict) else {}
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if settings.auth_introspection_url:
+            return await self._introspect(token)
+
+        entry = self._tokens.get(token)
+        if not isinstance(entry, dict):
+            return None
+        scopes = entry.get("scopes", [settings.required_scope])
+        if not isinstance(scopes, list) or settings.required_scope not in scopes:
+            return None
+        return self._access_token(token, entry, [str(scope) for scope in scopes])
+
+    async def _introspect(self, token: str) -> AccessToken | None:
+        auth = None
+        if settings.auth_client_id and settings.auth_client_secret:
+            auth = (settings.auth_client_id, settings.auth_client_secret)
+        response = await self._client.post(
+            str(settings.auth_introspection_url),
+            data={"token": token},
+            auth=auth,
+        )
+        if response.status_code >= 500:
+            return None
+        response.raise_for_status()
+        body: dict[str, Any] = response.json()
+        if not body.get("active"):
+            return None
+        scope_text = body.get("scope", "")
+        scopes = scope_text.split() if isinstance(scope_text, str) else list(scope_text or [])
+        if settings.required_scope not in scopes:
+            return None
+        return self._access_token(token, body, [str(scope) for scope in scopes])
+
+    def _access_token(
+        self,
+        token: str,
+        claims: dict[str, Any],
+        scopes: list[str],
+    ) -> AccessToken:
+        return AccessToken(
+            token=token,
+            client_id=str(claims.get("client_id", claims.get("sub", "unknown"))),
+            scopes=scopes,
+            resource=str(settings.public_url),
+            subject=str(claims["sub"]) if claims.get("sub") else None,
+            claims={"tenant_id": claims.get("tenant_id")} if claims.get("tenant_id") else claims,
+        )
