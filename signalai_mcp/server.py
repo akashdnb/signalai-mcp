@@ -107,7 +107,11 @@ def require_tool_scope(scope: str) -> tuple[str, str, str]:
 def is_write_scope(scope: str | None) -> bool:
     return scope in {
         settings.write_scope,
+        settings.automation_write_scope,
+        settings.automation_validate_scope,
         settings.automation_publish_scope,
+        settings.automation_activate_scope,
+        settings.automation_pause_scope,
         settings.automation_operate_scope,
     }
 
