@@ -101,37 +101,6 @@ def require_tool_scope(scope: str) -> tuple[str, str, str]:
     return identity
 
 
-def idempotency_key(value: str) -> str:
-    key = value.strip()
-    if not key or len(key) > 200:
-        raise ValueError("idempotency_key_invalid")
-    return key
-
-
-def authenticated_identity() -> tuple[str, str, str]:
-    token = get_access_token()
-    if token is None:
-        raise PermissionError("authentication_required")
-    claims = token.claims or {}
-    tenant_id = claims.get("tenant_id")
-    principal_id = token.subject or claims.get("sub")
-    client_id = token.client_id
-    if not tenant_id:
-        raise PermissionError("tenant_not_found")
-    if not principal_id or not client_id:
-        raise PermissionError("invalid_token")
-    return str(tenant_id), str(principal_id), str(client_id)
-
-
-def require_tool_scope(scope: str) -> tuple[str, str, str]:
-    identity = authenticated_identity()
-    token = get_access_token()
-    scopes = set(token.scopes if token else [])
-    if scope not in scopes:
-        raise PermissionError("insufficient_scope")
-    return identity
-
-
 def idempotency_key(value: str | None) -> str:
     key = (value or "").strip()
     if not key or len(key) > 200:
