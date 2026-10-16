@@ -34,6 +34,17 @@ def resource_server_url() -> str:
     return canonical_url(settings.public_url)
 
 
+@mcp.custom_route("/.well-known/oauth-protected-resource/mcp", methods=["GET"])
+async def protected_resource_metadata(_request: Request) -> Response:
+    """Publish supported OAuth scopes for the MCP resource."""
+    return JSONResponse({
+        "resource": resource_server_url(),
+        "authorization_servers": [oauth_issuer_url()],
+        "scopes_supported": [settings.read_scope, settings.write_scope],
+        "bearer_methods_supported": ["header"],
+    })
+
+
 @asynccontextmanager
 async def lifespan(_server: MCPServer) -> AsyncIterator[AppContext]:
     client = CapabilityClient()
@@ -82,6 +93,14 @@ def require_tool_scope(scope: str) -> tuple[str, str, str]:
     return identity
 
 
+
+
+def idempotency_key(value: str | None) -> str:
+    key = (value or "").strip()
+    if not key or len(key) > 200:
+        raise ValueError("idempotency_key_invalid")
+    return key
+
 async def invoke(
     ctx: Context[AppContext],
     capability: str,
@@ -100,7 +119,7 @@ async def invoke(
         input=input,
         principal_id=principal_id if scope == settings.write_scope else None,
         client_id=client_id if scope == settings.write_scope else None,
-        idempotency_key=write_key if scope == settings.write_scope else None,
+        idempotency_key=idempotency_key(write_key) if scope == settings.write_scope else None,
     )
 
 
