@@ -67,12 +67,25 @@ def tenant_from_token() -> str:
     return str(tenant_id)
 
 
-async def invoke(ctx: Context[AppContext], capability: str, input: dict) -> dict:
+async def invoke(
+    ctx: Context[AppContext],
+    capability: str,
+    input: dict,
+    *,
+    scope: str | None = None,
+    write_key: str | None = None,
+) -> dict:
+    tenant_id, principal_id, client_id = (
+        require_tool_scope(scope) if scope else authenticated_identity()
+    )
     return await ctx.request_context.lifespan_context.capabilities.invoke(
         capability,
-        tenant_id=tenant_from_token(),
+        tenant_id=tenant_id,
         correlation_id=str(ctx.request_id),
         input=input,
+        principal_id=principal_id if scope == settings.write_scope else None,
+        client_id=client_id if scope == settings.write_scope else None,
+        idempotency_key=idempotency_key(write_key) if write_key is not None else None,
     )
 
 
@@ -93,6 +106,37 @@ async def protected_resource_metadata(_request: Request) -> Response:
             "bearer_methods_supported": ["header"],
         }
     )
+
+
+def authenticated_identity() -> tuple[str, str, str]:
+    token = get_access_token()
+    if token is None:
+        raise PermissionError("authentication_required")
+    claims = token.claims or {}
+    tenant_id = claims.get("tenant_id")
+    principal_id = token.subject or claims.get("sub")
+    client_id = token.client_id
+    if not tenant_id:
+        raise PermissionError("tenant_not_found")
+    if not principal_id or not client_id:
+        raise PermissionError("invalid_token")
+    return str(tenant_id), str(principal_id), str(client_id)
+
+
+def require_tool_scope(scope: str) -> tuple[str, str, str]:
+    identity = authenticated_identity()
+    token = get_access_token()
+    scopes = set(token.scopes if token else [])
+    if scope not in scopes:
+        raise PermissionError("insufficient_scope")
+    return identity
+
+
+def idempotency_key(value: str) -> str:
+    key = value.strip()
+    if not key or len(key) > 200:
+        raise ValueError("idempotency_key_invalid")
+    return key
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -148,6 +192,74 @@ async def list_automations(ctx: Context[AppContext], limit: int = 50) -> dict:
 async def get_automation(automation_id: str, ctx: Context[AppContext]) -> dict:
     """Get an automation including its editable graph and latest published version."""
     return await invoke(ctx, "automation.get", {"automation_id": automation_id})
+
+
+
+@mcp.tool()
+async def create_automation_draft(
+    name: str,
+    trigger: str,
+    ctx: Context[AppContext],
+    idempotency_key: str,
+    nodes: list[dict[str, Any]] | None = None,
+    edges: list[dict[str, Any]] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict:
+    """Create a new SignalAI automation as a draft. It is not published or activated."""
+    payload: dict[str, Any] = {"name": name, "trigger": trigger}
+    if nodes is not None:
+        payload["nodes"] = nodes
+    if edges is not None:
+        payload["edges"] = edges
+    if metadata is not None:
+        payload["metadata"] = metadata
+    return await invoke(
+        ctx, "automation.create_draft", payload,
+        scope=settings.write_scope, write_key=idempotency_key,
+    )
+
+
+@mcp.tool()
+async def update_automation_draft(
+    automation_id: str,
+    expected_version: int,
+    changes: dict[str, Any],
+    idempotency_key: str,
+    ctx: Context[AppContext],
+) -> dict:
+    """Update an unpublished, inactive SignalAI automation draft using optimistic version checks; this never publishes or activates it."""
+    return await invoke(
+        ctx,
+        "automation.update_draft",
+        {"automation_id": automation_id, "expected_version": expected_version, "changes": changes},
+        scope=settings.write_scope,
+        write_key=idempotency_key,
+    )
+
+
+@mcp.tool()
+async def validate_automation(
+    ctx: Context[AppContext],
+    idempotency_key: str,
+    automation_id: str | None = None,
+    nodes: list[dict[str, Any]] | None = None,
+    edges: list[dict[str, Any]] | None = None,
+    expected_version: int | None = None,
+) -> dict:
+    """Validate a SignalAI journey draft with the server's existing validation rules. Validation never publishes or activates the journey."""
+    payload: dict[str, Any] = {}
+    if automation_id is not None:
+        payload["automation_id"] = automation_id
+    if nodes is not None:
+        payload["nodes"] = nodes
+    if edges is not None:
+        payload["edges"] = edges
+    if expected_version is not None:
+        payload["expected_version"] = expected_version
+    return await invoke(
+        ctx, "automation.validate", payload,
+        scope=settings.write_scope, write_key=idempotency_key,
+    )
 
 
 # Campaigns
