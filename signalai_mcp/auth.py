@@ -27,6 +27,10 @@ class ConfiguredTokenVerifier(TokenVerifier):
             return {}
         return configured if isinstance(configured, dict) else {}
 
+    @staticmethod
+    def _canonical_url(value: object) -> str:
+        return str(value).rstrip("/")
+
     async def verify_token(self, token: str) -> AccessToken | None:
         if settings.auth_introspection_url:
             return await self._introspect(token)
@@ -64,6 +68,20 @@ class ConfiguredTokenVerifier(TokenVerifier):
         scopes = scope_text.split() if isinstance(scope_text, str) else list(scope_text or [])
         if settings.required_scope not in scopes:
             return None
+
+        issuer = body.get("iss")
+        if issuer is not None and self._canonical_url(issuer) != self._canonical_url(settings.auth_issuer_url):
+            return None
+
+        expected_resource = self._canonical_url(settings.public_url)
+        audience = body.get("aud")
+        if isinstance(audience, list):
+            audience_values = [self._canonical_url(item) for item in audience]
+        else:
+            audience_values = [self._canonical_url(audience)] if audience else []
+        if expected_resource not in audience_values:
+            return None
+
         return self._access_token(token, body, [str(scope) for scope in scopes])
 
     def _access_token(
@@ -72,11 +90,21 @@ class ConfiguredTokenVerifier(TokenVerifier):
         claims: dict[str, Any],
         scopes: list[str],
     ) -> AccessToken:
+        normalized_claims = {
+            "tenant_id": str(claims["tenant_id"]),
+            "iss": str(claims.get("iss", settings.auth_issuer_url)).rstrip("/"),
+            "aud": claims.get("aud", settings.public_url),
+        }
+        if claims.get("sub"):
+            normalized_claims["sub"] = str(claims["sub"])
+        if claims.get("exp"):
+            normalized_claims["exp"] = claims["exp"]
+
         return AccessToken(
             token=token,
             client_id=str(claims.get("client_id", claims.get("sub", "unknown"))),
             scopes=scopes,
             resource=str(claims.get("aud", settings.public_url)),
             subject=str(claims["sub"]) if claims.get("sub") else None,
-            claims={"tenant_id": str(claims["tenant_id"]), "iss": str(settings.auth_issuer_url)},
+            claims=normalized_claims,
         )
