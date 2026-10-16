@@ -8,7 +8,7 @@ from signalai_mcp.config import settings
 
 
 class ConfiguredTokenVerifier(TokenVerifier):
-    """Verify bearer tokens through RFC 7662 or an explicit test-token map."""
+    """Verify SignalAI OAuth bearer tokens through RFC 7662 introspection or explicit test tokens."""
 
     def __init__(self) -> None:
         self._tokens = self._load_tokens()
@@ -42,14 +42,14 @@ class ConfiguredTokenVerifier(TokenVerifier):
         return self._access_token(token, entry, [str(scope) for scope in scopes])
 
     async def _introspect(self, token: str) -> AccessToken | None:
-        auth = None
-        if settings.auth_client_id and settings.auth_client_secret:
-            auth = (settings.auth_client_id, settings.auth_client_secret)
+        headers = {"Accept": "application/json"}
+        if settings.service_token:
+            headers["X-SignalAI-Service-Token"] = settings.service_token
         try:
             response = await self._client.post(
                 str(settings.auth_introspection_url),
                 data={"token": token},
-                auth=auth,
+                headers=headers,
             )
             if response.status_code >= 500:
                 return None
@@ -76,7 +76,7 @@ class ConfiguredTokenVerifier(TokenVerifier):
             token=token,
             client_id=str(claims.get("client_id", claims.get("sub", "unknown"))),
             scopes=scopes,
-            resource=str(settings.public_url),
+            resource=str(claims.get("aud", settings.public_url)),
             subject=str(claims["sub"]) if claims.get("sub") else None,
-            claims={"tenant_id": str(claims["tenant_id"])},
+            claims={"tenant_id": str(claims["tenant_id"]), "iss": str(settings.auth_issuer_url)},
         )
