@@ -34,17 +34,6 @@ def resource_server_url() -> str:
     return canonical_url(settings.public_url)
 
 
-@mcp.custom_route("/.well-known/oauth-protected-resource/mcp", methods=["GET"])
-async def protected_resource_metadata(_request: Request) -> Response:
-    """Publish supported OAuth scopes for the MCP resource."""
-    return JSONResponse({
-        "resource": resource_server_url(),
-        "authorization_servers": [oauth_issuer_url()],
-        "scopes_supported": [settings.read_scope, settings.write_scope],
-        "bearer_methods_supported": ["header"],
-    })
-
-
 @asynccontextmanager
 async def lifespan(_server: MCPServer) -> AsyncIterator[AppContext]:
     client = CapabilityClient()
@@ -67,6 +56,17 @@ mcp = MCPServer(
         validate_token_resource=True,
     ),
 )
+
+
+@mcp.custom_route("/.well-known/oauth-protected-resource/mcp", methods=["GET"])
+async def protected_resource_metadata(_request: Request) -> Response:
+    """Publish supported OAuth scopes for the MCP resource."""
+    return JSONResponse({
+        "resource": resource_server_url(),
+        "authorization_servers": [oauth_issuer_url()],
+        "scopes_supported": [settings.read_scope, settings.write_scope],
+        "bearer_methods_supported": ["header"],
+    })
 
 
 def authenticated_identity() -> tuple[str, str, str]:
