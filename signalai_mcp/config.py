@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     auth_introspection_url: AnyHttpUrl | None = None
     auth_client_id: str | None = None
     auth_client_secret: str | None = None
+    auth_tokens: str | None = None
     required_scope: str = "signalai:read"
     capability_base_url: AnyHttpUrl = "http://signalai-server:3000"
     capability_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
