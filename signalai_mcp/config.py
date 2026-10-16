@@ -13,3 +13,13 @@ class Settings(BaseSettings):
     capability_base_url: AnyHttpUrl = "http://signalai-server:3000"
     capability_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     service_token: str | None = None
+    allowed_hosts: str = "localhost,127.0.0.1"
+    allowed_origins: str = "http://localhost:8000"
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [item.strip() for item in self.allowed_hosts.split(",") if item.strip()]
+
+    @property
+    def allowed_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.allowed_origins.split(",") if item.strip()]
