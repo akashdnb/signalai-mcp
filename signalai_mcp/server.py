@@ -50,7 +50,8 @@ mcp = MCPServer(
     auth=AuthSettings(
         issuer_url=AnyHttpUrl(oauth_issuer_url()),
         resource_server_url=AnyHttpUrl(resource_server_url()),
-        required_scopes=[settings.required_scope],
+        # Scope is enforced per tool so read-only and write-enabled clients can coexist.
+        required_scopes=[],
         validate_token_resource=True,
     ),
 )
@@ -88,7 +89,7 @@ async def protected_resource_metadata(_request: Request) -> Response:
         {
             "resource": resource_server_url(),
             "authorization_servers": [oauth_issuer_url()],
-            "scopes_supported": [settings.required_scope],
+            "scopes_supported": [settings.read_scope, settings.write_scope],
             "bearer_methods_supported": ["header"],
         }
     )
