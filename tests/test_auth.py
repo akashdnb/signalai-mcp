@@ -84,6 +84,7 @@ async def test_configured_token_verifier_introspects_with_service_token(monkeypa
     monkeypatch.setattr(settings, "auth_tokens", None)
     monkeypatch.setattr(settings, "auth_introspection_url", "https://signalai-server.example/oauth/introspect")
     monkeypatch.setattr(settings, "service_token", "service-secret")
+    monkeypatch.setattr(settings, "public_url", "https://signalai-mcp.example/mcp")
     verifier = ConfiguredTokenVerifier()
     response = httpx.Response(
         200,
