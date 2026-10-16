@@ -11,6 +11,12 @@ services:
         sync: false
       - key: SIGNALAI_AUTH_ISSUER_URL
         sync: false
+      - key: SIGNALAI_AUTH_INTROSPECTION_URL
+        sync: false
+      - key: SIGNALAI_AUTH_CLIENT_ID
+        sync: false
+      - key: SIGNALAI_AUTH_CLIENT_SECRET
+        sync: false
       - key: SIGNALAI_CAPABILITY_BASE_URL
         sync: false
       - key: SIGNALAI_SERVICE_TOKEN
