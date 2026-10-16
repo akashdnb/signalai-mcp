@@ -31,6 +31,15 @@ class ConfiguredTokenVerifier(TokenVerifier):
     def _canonical_url(value: object) -> str:
         return str(value).rstrip("/")
 
+    @staticmethod
+    def _supported_scopes() -> set[str]:
+        return {
+            settings.read_scope,
+            settings.write_scope,
+            settings.automation_publish_scope,
+            settings.automation_operate_scope,
+        }
+
     async def verify_token(self, token: str) -> AccessToken | None:
         if settings.auth_introspection_url:
             return await self._introspect(token)
@@ -42,7 +51,7 @@ class ConfiguredTokenVerifier(TokenVerifier):
         if (
             not isinstance(scopes, list)
             or not scopes
-            or any(not isinstance(scope, str) or scope not in {settings.read_scope, settings.write_scope} for scope in scopes)
+            or any(not isinstance(scope, str) or scope not in self._supported_scopes() for scope in scopes)
         ):
             return None
         if not entry.get("tenant_id") or not entry.get("sub") or not entry.get("client_id"):
@@ -70,7 +79,7 @@ class ConfiguredTokenVerifier(TokenVerifier):
             return None
         scope_text = body.get("scope", "")
         scopes = scope_text.split() if isinstance(scope_text, str) else list(scope_text or [])
-        if not scopes or any(scope not in {settings.read_scope, settings.write_scope} for scope in scopes):
+        if not scopes or any(scope not in self._supported_scopes() for scope in scopes):
             return None
 
         issuer = body.get("iss")

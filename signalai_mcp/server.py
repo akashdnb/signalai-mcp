@@ -59,11 +59,16 @@ mcp = MCPServer(
 
 @mcp.custom_route("/.well-known/oauth-protected-resource/mcp", methods=["GET"])
 async def protected_resource_metadata(_request: Request) -> Response:
-    """Publish supported OAuth scopes for the MCP resource."""
+    """Publish all opt-in OAuth scopes supported by the MCP resource."""
     return JSONResponse({
         "resource": resource_server_url(),
         "authorization_servers": [oauth_issuer_url()],
-        "scopes_supported": [settings.read_scope, settings.write_scope],
+        "scopes_supported": [
+            settings.read_scope,
+            settings.write_scope,
+            settings.automation_publish_scope,
+            settings.automation_operate_scope,
+        ],
         "bearer_methods_supported": ["header"],
     })
 
@@ -92,6 +97,14 @@ def require_tool_scope(scope: str) -> tuple[str, str, str]:
     return identity
 
 
+def is_write_scope(scope: str | None) -> bool:
+    return scope in {
+        settings.write_scope,
+        settings.automation_publish_scope,
+        settings.automation_operate_scope,
+    }
+
+
 def idempotency_key(value: str | None) -> str:
     key = (value or "").strip()
     if not key or len(key) > 200:
@@ -110,14 +123,15 @@ async def invoke(
     tenant_id, principal_id, client_id = (
         require_tool_scope(scope) if scope else authenticated_identity()
     )
+    write_operation = is_write_scope(scope)
     return await ctx.request_context.lifespan_context.capabilities.invoke(
         capability,
         tenant_id=tenant_id,
         correlation_id=str(ctx.request_id),
         input=input,
-        principal_id=principal_id if scope == settings.write_scope else None,
-        client_id=client_id if scope == settings.write_scope else None,
-        idempotency_key=idempotency_key(write_key) if scope == settings.write_scope else None,
+        principal_id=principal_id if write_operation else None,
+        client_id=client_id if write_operation else None,
+        idempotency_key=idempotency_key(write_key) if write_operation else None,
     )
 
 
@@ -225,6 +239,55 @@ async def validate_automation(
     if expected_version is not None:
         payload["expected_version"] = expected_version
     return await invoke(ctx, "automation.validate", payload, scope=settings.write_scope, write_key=idempotency_key)
+
+
+@mcp.tool()
+async def publish_automation(
+    automation_id: str,
+    expected_version: int,
+    idempotency_key: str,
+    ctx: Context[AppContext],
+) -> dict:
+    """Publish an inactive, validated automation. This does not activate it."""
+    return await invoke(
+        ctx,
+        "automation.publish",
+        {"automation_id": automation_id, "expected_version": expected_version},
+        scope=settings.automation_publish_scope,
+        write_key=idempotency_key,
+    )
+
+
+@mcp.tool()
+async def activate_automation(
+    automation_id: str,
+    idempotency_key: str,
+    ctx: Context[AppContext],
+) -> dict:
+    """Activate a published automation. Activation requires the automation-operation opt-in scope."""
+    return await invoke(
+        ctx,
+        "automation.activate",
+        {"automation_id": automation_id},
+        scope=settings.automation_operate_scope,
+        write_key=idempotency_key,
+    )
+
+
+@mcp.tool()
+async def pause_automation(
+    automation_id: str,
+    idempotency_key: str,
+    ctx: Context[AppContext],
+) -> dict:
+    """Pause an active automation. Pausing requires the automation-operation opt-in scope."""
+    return await invoke(
+        ctx,
+        "automation.pause",
+        {"automation_id": automation_id},
+        scope=settings.automation_operate_scope,
+        write_key=idempotency_key,
+    )
 
 
 # Campaigns

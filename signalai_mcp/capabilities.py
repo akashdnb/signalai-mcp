@@ -72,7 +72,7 @@ class CapabilityClient:
                 "insufficient_scope", "tenant_not_found", "resource_not_found",
                 "validation_error", "capability_unavailable", "upstream_error",
                 "rate_limited", "version_conflict", "invalid_lifecycle_state",
-                "idempotency_conflict", "idempotency_in_progress",
+                "activation_not_ready", "idempotency_conflict", "idempotency_in_progress",
             }
             code = body.get("code") or body.get("error")
             if not isinstance(code, str) or code not in safe_codes:
