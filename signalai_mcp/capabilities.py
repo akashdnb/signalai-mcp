@@ -1,5 +1,7 @@
 from typing import Any
 
+from httpx import HTTPStatusError
+
 import httpx
 
 from signalai_mcp.config import settings
