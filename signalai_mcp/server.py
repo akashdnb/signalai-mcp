@@ -21,6 +21,18 @@ class AppContext:
     capabilities: CapabilityClient
 
 
+def canonical_url(value: object) -> str:
+    return str(value).rstrip("/")
+
+
+def oauth_issuer_url() -> str:
+    return canonical_url(settings.auth_issuer_url)
+
+
+def resource_server_url() -> str:
+    return canonical_url(settings.public_url)
+
+
 @asynccontextmanager
 async def lifespan(_server: MCPServer) -> AsyncIterator[AppContext]:
     client = CapabilityClient()
@@ -36,8 +48,8 @@ mcp = MCPServer(
     lifespan=lifespan,
     token_verifier=ConfiguredTokenVerifier(),
     auth=AuthSettings(
-        issuer_url=AnyHttpUrl(str(settings.auth_issuer_url)),
-        resource_server_url=AnyHttpUrl(str(settings.public_url)),
+        issuer_url=AnyHttpUrl(oauth_issuer_url()),
+        resource_server_url=AnyHttpUrl(resource_server_url()),
         required_scopes=[settings.required_scope],
         validate_token_resource=True,
     ),
@@ -60,6 +72,25 @@ async def invoke(ctx: Context[AppContext], capability: str, input: dict) -> dict
         tenant_id=tenant_from_token(),
         correlation_id=str(ctx.request_id),
         input=input,
+    )
+
+
+@mcp.custom_route("/.well-known/oauth-protected-resource/mcp", methods=["GET"])
+async def protected_resource_metadata(_request: Request) -> Response:
+    """Publish canonical RFC 9728 metadata for the /mcp resource.
+
+    The MCP SDK's URL type normalizes HTTP URLs with a trailing slash. OAuth
+    issuer identifiers are exact strings, so keep the advertised authorization
+    server identical to SignalAI's issuer metadata instead of emitting a
+    slash-variant that some clients treat as a different issuer.
+    """
+    return JSONResponse(
+        {
+            "resource": resource_server_url(),
+            "authorization_servers": [oauth_issuer_url()],
+            "scopes_supported": [settings.required_scope],
+            "bearer_methods_supported": ["header"],
+        }
     )
 
 
