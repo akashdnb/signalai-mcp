@@ -1,5 +1,7 @@
 import json
+from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 
 from signalai_mcp.auth import ConfiguredTokenVerifier
@@ -73,5 +75,39 @@ async def test_configured_token_verifier_rejects_missing_tenant(monkeypatch):
     verifier = ConfiguredTokenVerifier()
     try:
         assert await verifier.verify_token("token-c") is None
+    finally:
+        await verifier.close()
+
+
+@pytest.mark.asyncio
+async def test_configured_token_verifier_introspects_with_service_token(monkeypatch):
+    monkeypatch.setattr(settings, "auth_tokens", None)
+    monkeypatch.setattr(settings, "auth_introspection_url", "https://signalai-server.example/oauth/introspect")
+    monkeypatch.setattr(settings, "service_token", "service-secret")
+    verifier = ConfiguredTokenVerifier()
+    response = httpx.Response(
+        200,
+        json={
+            "active": True,
+            "client_id": "client-d",
+            "tenant_id": "tenant-d",
+            "scope": settings.required_scope,
+            "sub": "user-d",
+            "aud": "https://signalai-mcp.example/mcp",
+            "exp": 4102444800,
+        },
+        request=httpx.Request("POST", "https://signalai-server.example/oauth/introspect"),
+    )
+    verifier._client.post = AsyncMock(return_value=response)  # type: ignore[method-assign]
+    try:
+        token = await verifier.verify_token("access-token")
+        assert token is not None
+        assert token.subject == "user-d"
+        assert token.claims["tenant_id"] == "tenant-d"
+        verifier._client.post.assert_awaited_once_with(
+            "https://signalai-server.example/oauth/introspect",
+            data={"token": "access-token"},
+            headers={"Accept": "application/json", "X-SignalAI-Service-Token": "service-secret"},
+        )
     finally:
         await verifier.close()
