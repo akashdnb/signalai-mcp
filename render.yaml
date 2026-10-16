@@ -17,6 +17,8 @@ services:
         sync: false
       - key: SIGNALAI_AUTH_CLIENT_SECRET
         sync: false
+      - key: SIGNALAI_AUTH_TOKENS
+        sync: false
       - key: SIGNALAI_CAPABILITY_BASE_URL
         sync: false
       - key: SIGNALAI_SERVICE_TOKEN
