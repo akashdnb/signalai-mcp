@@ -27,11 +27,27 @@ get_automation
 create_automation_draft
 validate_automation
 publish_automation
+activate_automation
+pause_automation
 get_lead_metrics
 get_campaign_metrics
 ```
 
 Avoid exposing storage or implementation terms.
+
+## Automation lifecycle scopes
+
+Automation mutations are intentionally split by impact:
+
+| OAuth scope | Tools | Purpose | Default |
+|---|---|---|---|
+| `signalai:write` | `create_automation_draft`, `update_automation_draft`, `validate_automation` | Prepare and validate drafts | existing write opt-in |
+| `signalai:automation:publish` | `publish_automation` | Publish an inactive validated draft | opt-in, off unless granted |
+| `signalai:automation:operate` | `activate_automation`, `pause_automation` | Start/stop an already-published automation | opt-in, off unless granted |
+
+The dashboard is the future control plane for granting/revoking these scopes. Until that UI exists, an OAuth client must explicitly request the lifecycle scope and the MCP resource will only use it when the issued token contains it.
+
+A token with `signalai:write` alone cannot publish, activate, or pause an automation.
 
 ## Action tiers
 
@@ -42,6 +58,22 @@ Avoid exposing storage or implementation terms.
 | WRITE | update CRM/add note/create content | policy dependent |
 | EXECUTE | publish/send/bulk operation | explicit permission; approval where high impact |
 
+Publishing and activation/pause are EXECUTE-level automation operations and require their dedicated scopes.
+
+## Automation lifecycle
+
+```text
+create draft -> update/save -> validate -> publish -> activate -> pause
+                                              ^             |
+                                              |-------------|
+```
+
+`publish_automation` requires an inactive, unpublished draft and an expected builder version. Publishing creates an immutable runtime snapshot but does not activate it.
+
+`activate_automation` requires a published automation and at least one healthy assigned Instagram account.
+
+`pause_automation` only pauses an active automation. Repeated lifecycle requests return a structured lifecycle conflict rather than silently changing state.
+
 ## Mutation safety
 
 Mutating tools should accept an idempotency key. High-impact operations should support a preview/dry-run form when feasible.
@@ -49,7 +81,7 @@ Mutating tools should accept an idempotency key. High-impact operations should s
 For journey changes, prefer:
 
 ```text
-create draft -> validate -> review -> publish
+create draft -> validate -> review -> publish -> activate
 ```
 
 The model must not directly alter an immutable published journey version.
