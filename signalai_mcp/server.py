@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -185,13 +186,13 @@ async def get_conversation(conversation_id: str, ctx: Context[AppContext]) -> di
 @mcp.tool()
 async def list_automations(ctx: Context[AppContext], limit: int = 50) -> dict:
     """List automations/journeys in the authenticated SignalAI workspace."""
-    return await invoke(ctx, "automation.list", {"limit": min(max(limit, 1), 100)})
+    return await invoke(ctx, "automation.list", {"limit": min(max(limit, 1), 100)}, scope=settings.read_scope)
 
 
 @mcp.tool()
 async def get_automation(automation_id: str, ctx: Context[AppContext]) -> dict:
     """Get an automation including its editable graph and latest published version."""
-    return await invoke(ctx, "automation.get", {"automation_id": automation_id})
+    return await invoke(ctx, "automation.get", {"automation_id": automation_id}, scope=settings.read_scope)
 
 
 
