@@ -60,13 +60,34 @@ async def health(_request: Request) -> Response:
 
 
 @mcp.tool()
-async def get_company(company_id: str, ctx: Context[AppContext]) -> dict:
-    """Get a company visible to the authenticated SignalAI workspace."""
-    return await ctx.request_context.lifespan_context.capabilities.invoke(
-        "company.get",
+async def search_companies(query: str, ctx: Context[AppContext], limit: int = 10) -> dict:
+    """Search external company intelligence visible to the authenticated SignalAI workspace."""
+    if not query.strip():
+        raise ValueError("company_search_query_required")
+    return await ctx.request_context.lifespan_context.capabilities.search_companies(
         tenant_id=tenant_from_token(),
         correlation_id=str(ctx.request_id),
-        input={"company_id": company_id},
+        query=query,
+        limit=limit,
+    )
+
+
+@mcp.tool()
+async def get_company(
+    ctx: Context[AppContext],
+    domain: str | None = None,
+    company_name: str | None = None,
+    linkedin_url: str | None = None,
+) -> dict:
+    """Research a company by domain, name, or LinkedIn URL."""
+    if not any((domain, company_name, linkedin_url)):
+        raise ValueError("company_identifier_required")
+    return await ctx.request_context.lifespan_context.capabilities.get_company(
+        tenant_id=tenant_from_token(),
+        correlation_id=str(ctx.request_id),
+        domain=domain,
+        company_name=company_name,
+        linkedin_url=linkedin_url,
     )
 
 
