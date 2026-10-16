@@ -17,8 +17,9 @@ async def test_configured_token_verifier_accepts_scoped_tenant_token(monkeypatch
             {
                 "token-a": {
                     "client_id": "client-a",
+                    "sub": "user-a",
                     "tenant_id": "tenant-a",
-                    "scopes": [settings.required_scope],
+                    "scopes": [settings.read_scope],
                 }
             }
         ),
@@ -43,6 +44,7 @@ async def test_configured_token_verifier_rejects_missing_scope(monkeypatch):
             {
                 "token-b": {
                     "client_id": "client-b",
+                    "sub": "user-b",
                     "tenant_id": "tenant-b",
                     "scopes": [],
                 }
@@ -66,7 +68,8 @@ async def test_configured_token_verifier_rejects_missing_tenant(monkeypatch):
             {
                 "token-c": {
                     "client_id": "client-c",
-                    "scopes": [settings.required_scope],
+                    "sub": "user-c",
+                    "scopes": [settings.read_scope],
                 }
             }
         ),
