@@ -2,7 +2,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
-from typing import Any
 
 from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
