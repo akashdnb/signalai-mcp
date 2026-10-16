@@ -15,14 +15,7 @@ class CapabilityClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def invoke(
-        self,
-        capability: str,
-        *,
-        tenant_id: str,
-        correlation_id: str,
-        input: dict[str, Any],
-    ) -> dict[str, Any]:
+    async def invoke(self, capability: str, *, tenant_id: str, correlation_id: str, input: dict[str, Any]) -> dict[str, Any]:
         response = await self._client.post(
             f"/v1/capabilities/{capability}:invoke",
             headers=self._headers(tenant_id, correlation_id),
@@ -31,14 +24,7 @@ class CapabilityClient:
         response.raise_for_status()
         return response.json()
 
-    async def search_companies(
-        self,
-        *,
-        tenant_id: str,
-        correlation_id: str,
-        query: str,
-        limit: int = 10,
-    ) -> dict[str, Any]:
+    async def search_companies(self, *, tenant_id: str, correlation_id: str, query: str, limit: int = 10) -> dict[str, Any]:
         response = await self._client.post(
             "/internal/capabilities/company/search",
             headers=self._headers(tenant_id, correlation_id),
@@ -56,18 +42,19 @@ class CapabilityClient:
         company_name: str | None = None,
         linkedin_url: str | None = None,
     ) -> dict[str, Any]:
+        payload = {
+            key: value
+            for key, value in {
+                "domain": domain,
+                "companyName": company_name,
+                "linkedinUrl": linkedin_url,
+            }.items()
+            if value
+        }
         response = await self._client.post(
             "/internal/capabilities/company/get",
             headers=self._headers(tenant_id, correlation_id),
-            json={
-                key: value
-                for key, value in {
-                    "domain": domain,
-                    "companyName": company_name,
-                    "linkedinUrl": linkedin_url,
-                }.items()
-                if value,
-            },
+            json=payload,
         )
         response.raise_for_status()
         return response.json()
