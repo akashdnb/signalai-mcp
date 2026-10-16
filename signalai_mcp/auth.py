@@ -36,7 +36,12 @@ class ConfiguredTokenVerifier(TokenVerifier):
         return {
             settings.read_scope,
             settings.write_scope,
+            settings.automation_read_scope,
+            settings.automation_write_scope,
+            settings.automation_validate_scope,
             settings.automation_publish_scope,
+            settings.automation_activate_scope,
+            settings.automation_pause_scope,
             settings.automation_operate_scope,
         }
 
