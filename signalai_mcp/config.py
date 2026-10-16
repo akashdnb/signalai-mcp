@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     service_version: str = "0.1.0"
     public_url: AnyHttpUrl = "http://localhost:8000/mcp"
     auth_issuer_url: AnyHttpUrl = "https://auth.example.com"
+    auth_introspection_url: AnyHttpUrl | None = None
+    auth_client_id: str | None = None
+    auth_client_secret: str | None = None
     required_scope: str = "signalai:read"
     capability_base_url: AnyHttpUrl = "http://signalai-server:3000"
     capability_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
