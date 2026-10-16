@@ -4,11 +4,12 @@ from dataclasses import dataclass
 
 from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import Context
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from mcp.server.auth.settings import AuthSettings
 
 from signalai_mcp.auth import ConfiguredTokenVerifier
 from signalai_mcp.capabilities import CapabilityClient
@@ -70,10 +71,8 @@ async def get_company(company_id: str, ctx: Context[AppContext]) -> dict:
 
 
 @mcp.tool()
-async def list_leads(limit: int = 50, ctx: Context[AppContext] = None) -> dict:
+async def list_leads(ctx: Context[AppContext], limit: int = 50) -> dict:
     """List leads visible to the authenticated SignalAI workspace."""
-    if ctx is None:
-        raise PermissionError("request_context_required")
     bounded_limit = min(max(limit, 1), 100)
     return await ctx.request_context.lifespan_context.capabilities.invoke(
         "lead.list",
@@ -108,4 +107,8 @@ async def list_automations(ctx: Context[AppContext]) -> dict:
 app = mcp.streamable_http_app(
     host="0.0.0.0",
     stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        allowed_hosts=settings.allowed_host_list,
+        allowed_origins=settings.allowed_origin_list,
+    ),
 )
