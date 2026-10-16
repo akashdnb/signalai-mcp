@@ -8,11 +8,13 @@ services:
     healthCheckPath: /health
     envVars:
       - key: SIGNALAI_PUBLIC_URL
-        sync: false
+        value: https://signalai-mcp-client.onrender.com/mcp
       - key: SIGNALAI_AUTH_ISSUER_URL
-        sync: false
+        value: https://signalai-server.onrender.com
       - key: SIGNALAI_AUTH_INTROSPECTION_URL
-        sync: false
+        value: https://signalai-server.onrender.com/oauth/introspect
+      # Retained for backwards-compatible test-token verification only. Production
+      # authorization uses the SignalAI OAuth issuer + RFC 7662 introspection above.
       - key: SIGNALAI_AUTH_CLIENT_ID
         sync: false
       - key: SIGNALAI_AUTH_CLIENT_SECRET
@@ -21,6 +23,8 @@ services:
         sync: false
       - key: SIGNALAI_CAPABILITY_BASE_URL
         sync: false
+      # This is the MCP -> SignalAI service credential. It is never exposed to
+      # the MCP client and is separate from the user's OAuth access token.
       - key: SIGNALAI_SERVICE_TOKEN
         sync: false
       - key: SIGNALAI_ALLOWED_HOSTS
