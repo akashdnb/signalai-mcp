@@ -16,7 +16,12 @@ class Settings(BaseSettings):
     required_scope: str = "signalai:read"  # Retained for backward-compatible config.
     read_scope: str = "signalai:read"
     write_scope: str = "signalai:write"
+    automation_read_scope: str = "automation:read"
+    automation_write_scope: str = "automation:write"
+    automation_validate_scope: str = "automation:validate"
     automation_publish_scope: str = "signalai:automation:publish"
+    automation_activate_scope: str = "automation:activate"
+    automation_pause_scope: str = "automation:pause"
     automation_operate_scope: str = "signalai:automation:operate"
     capability_base_url: AnyHttpUrl = "http://signalai-server:3000"
     capability_timeout_seconds: float = Field(default=30.0, gt=0, le=300)

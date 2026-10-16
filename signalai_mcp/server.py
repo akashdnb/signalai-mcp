@@ -63,10 +63,17 @@ async def protected_resource_metadata(_request: Request) -> Response:
     return JSONResponse({
         "resource": resource_server_url(),
         "authorization_servers": [oauth_issuer_url()],
+        # Keep legacy scopes discoverable while exposing the granular
+        # automation permissions supported by the authorization server.
         "scopes_supported": [
             settings.read_scope,
             settings.write_scope,
+            settings.automation_read_scope,
+            settings.automation_write_scope,
+            settings.automation_validate_scope,
             settings.automation_publish_scope,
+            settings.automation_activate_scope,
+            settings.automation_pause_scope,
             settings.automation_operate_scope,
         ],
         "bearer_methods_supported": ["header"],
@@ -100,7 +107,11 @@ def require_tool_scope(scope: str) -> tuple[str, str, str]:
 def is_write_scope(scope: str | None) -> bool:
     return scope in {
         settings.write_scope,
+        settings.automation_write_scope,
+        settings.automation_validate_scope,
         settings.automation_publish_scope,
+        settings.automation_activate_scope,
+        settings.automation_pause_scope,
         settings.automation_operate_scope,
     }
 
@@ -200,7 +211,7 @@ async def create_automation_draft(
         payload["edges"] = edges
     if metadata is not None:
         payload["metadata"] = metadata
-    return await invoke(ctx, "automation.create_draft", payload, scope=settings.write_scope, write_key=idempotency_key)
+    return await invoke(ctx, "automation.create_draft", payload, scope=settings.automation_write_scope, write_key=idempotency_key)
 
 
 @mcp.tool()
@@ -215,7 +226,7 @@ async def update_automation_draft(
     return await invoke(
         ctx, "automation.update_draft",
         {"automation_id": automation_id, "expected_version": expected_version, "changes": changes},
-        scope=settings.write_scope, write_key=idempotency_key,
+        scope=settings.automation_write_scope, write_key=idempotency_key,
     )
 
 
@@ -238,7 +249,7 @@ async def validate_automation(
         payload["edges"] = edges
     if expected_version is not None:
         payload["expected_version"] = expected_version
-    return await invoke(ctx, "automation.validate", payload, scope=settings.write_scope, write_key=idempotency_key)
+    return await invoke(ctx, "automation.validate", payload, scope=settings.automation_validate_scope, write_key=idempotency_key)
 
 
 @mcp.tool()
@@ -269,7 +280,7 @@ async def activate_automation(
         ctx,
         "automation.activate",
         {"automation_id": automation_id},
-        scope=settings.automation_operate_scope,
+        scope=settings.automation_activate_scope,
         write_key=idempotency_key,
     )
 
@@ -285,7 +296,7 @@ async def pause_automation(
         ctx,
         "automation.pause",
         {"automation_id": automation_id},
-        scope=settings.automation_operate_scope,
+        scope=settings.automation_pause_scope,
         write_key=idempotency_key,
     )
 

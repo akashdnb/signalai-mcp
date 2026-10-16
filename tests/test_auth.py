@@ -213,3 +213,35 @@ async def test_configured_token_verifier_rejects_bad_audience(monkeypatch):
         assert await verifier.verify_token("bad-audience-token") is None
     finally:
         await verifier.close()
+
+
+@pytest.mark.asyncio
+async def test_configured_token_verifier_accepts_granular_automation_scopes(monkeypatch):
+    scopes = [
+        settings.automation_read_scope,
+        settings.automation_write_scope,
+        settings.automation_validate_scope,
+        settings.automation_publish_scope,
+        settings.automation_activate_scope,
+        settings.automation_pause_scope,
+    ]
+    monkeypatch.setattr(
+        settings,
+        "auth_tokens",
+        json.dumps({
+            "granular-token": {
+                "client_id": "client-granular",
+                "sub": "user-granular",
+                "tenant_id": "tenant-granular",
+                "scopes": scopes,
+            }
+        }),
+    )
+    monkeypatch.setattr(settings, "auth_introspection_url", None)
+    verifier = ConfiguredTokenVerifier()
+    try:
+        token = await verifier.verify_token("granular-token")
+        assert token is not None
+        assert token.scopes == scopes
+    finally:
+        await verifier.close()
