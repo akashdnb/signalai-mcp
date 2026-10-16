@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
+from typing import Any
 
 from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -58,38 +59,6 @@ mcp = MCPServer(
 )
 
 
-def tenant_from_token() -> str:
-    token = get_access_token()
-    if token is None:
-        raise PermissionError("authentication_required")
-    tenant_id = token.claims.get("tenant_id") if token.claims else None
-    if not tenant_id:
-        raise PermissionError("tenant_claim_required")
-    return str(tenant_id)
-
-
-async def invoke(
-    ctx: Context[AppContext],
-    capability: str,
-    input: dict,
-    *,
-    scope: str | None = None,
-    write_key: str | None = None,
-) -> dict:
-    tenant_id, principal_id, client_id = (
-        require_tool_scope(scope) if scope else authenticated_identity()
-    )
-    return await ctx.request_context.lifespan_context.capabilities.invoke(
-        capability,
-        tenant_id=tenant_id,
-        correlation_id=str(ctx.request_id),
-        input=input,
-        principal_id=principal_id if scope == settings.write_scope else None,
-        client_id=client_id if scope == settings.write_scope else None,
-        idempotency_key=idempotency_key(write_key) if write_key is not None else None,
-    )
-
-
 @mcp.custom_route("/.well-known/oauth-protected-resource/mcp", methods=["GET"])
 async def protected_resource_metadata(_request: Request) -> Response:
     """Publish canonical RFC 9728 metadata for the /mcp resource.
@@ -138,6 +107,59 @@ def idempotency_key(value: str) -> str:
     if not key or len(key) > 200:
         raise ValueError("idempotency_key_invalid")
     return key
+
+
+def authenticated_identity() -> tuple[str, str, str]:
+    token = get_access_token()
+    if token is None:
+        raise PermissionError("authentication_required")
+    claims = token.claims or {}
+    tenant_id = claims.get("tenant_id")
+    principal_id = token.subject or claims.get("sub")
+    client_id = token.client_id
+    if not tenant_id:
+        raise PermissionError("tenant_not_found")
+    if not principal_id or not client_id:
+        raise PermissionError("invalid_token")
+    return str(tenant_id), str(principal_id), str(client_id)
+
+
+def require_tool_scope(scope: str) -> tuple[str, str, str]:
+    identity = authenticated_identity()
+    token = get_access_token()
+    scopes = set(token.scopes if token else [])
+    if scope not in scopes:
+        raise PermissionError("insufficient_scope")
+    return identity
+
+
+def idempotency_key(value: str | None) -> str:
+    key = (value or "").strip()
+    if not key or len(key) > 200:
+        raise ValueError("idempotency_key_invalid")
+    return key
+
+
+async def invoke(
+    ctx: Context[AppContext],
+    capability: str,
+    input: dict,
+    *,
+    scope: str | None = None,
+    write_key: str | None = None,
+) -> dict:
+    tenant_id, principal_id, client_id = (
+        require_tool_scope(scope) if scope else authenticated_identity()
+    )
+    return await ctx.request_context.lifespan_context.capabilities.invoke(
+        capability,
+        tenant_id=tenant_id,
+        correlation_id=str(ctx.request_id),
+        input=input,
+        principal_id=principal_id if scope == settings.write_scope else None,
+        client_id=client_id if scope == settings.write_scope else None,
+        idempotency_key=idempotency_key(write_key) if write_key is not None else None,
+    )
 
 
 @mcp.custom_route("/health", methods=["GET"])
