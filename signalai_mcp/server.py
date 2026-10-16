@@ -140,20 +140,20 @@ async def health(_request: Request) -> Response:
 @mcp.tool()
 async def get_company(company_id: str, ctx: Context[AppContext]) -> dict:
     """Get a company visible to the authenticated SignalAI workspace."""
-    return await invoke(ctx, "company.get", {"company_id": company_id})
+    return await invoke(ctx, "company.get", {"company_id": company_id}, scope=settings.read_scope)
 
 
 # Leads
 @mcp.tool()
 async def list_leads(ctx: Context[AppContext], limit: int = 50) -> dict:
     """List leads in the authenticated SignalAI workspace."""
-    return await invoke(ctx, "lead.list", {"limit": min(max(limit, 1), 100)})
+    return await invoke(ctx, "lead.list", {"limit": min(max(limit, 1), 100)}, scope=settings.read_scope)
 
 
 @mcp.tool()
 async def get_lead(lead_id: str, ctx: Context[AppContext]) -> dict:
     """Get one SignalAI lead by ID."""
-    return await invoke(ctx, "lead.get", {"lead_id": lead_id})
+    return await invoke(ctx, "lead.get", {"lead_id": lead_id}, scope=settings.read_scope)
 
 
 # Conversations
@@ -163,13 +163,13 @@ async def list_conversations(ctx: Context[AppContext], limit: int = 50, lead_id:
     payload = {"limit": min(max(limit, 1), 100)}
     if lead_id:
         payload["lead_id"] = lead_id
-    return await invoke(ctx, "conversation.list", payload)
+    return await invoke(ctx, "conversation.list", payload, scope=settings.read_scope)
 
 
 @mcp.tool()
 async def get_conversation(conversation_id: str, ctx: Context[AppContext]) -> dict:
     """Get a SignalAI conversation and its event history."""
-    return await invoke(ctx, "conversation.get", {"conversation_id": conversation_id})
+    return await invoke(ctx, "conversation.get", {"conversation_id": conversation_id}, scope=settings.read_scope)
 
 
 # Automations
@@ -257,46 +257,46 @@ async def validate_automation(
 @mcp.tool()
 async def list_campaigns(ctx: Context[AppContext], limit: int = 50) -> dict:
     """List campaigns in the authenticated SignalAI workspace."""
-    return await invoke(ctx, "campaign.list", {"limit": min(max(limit, 1), 100)})
+    return await invoke(ctx, "campaign.list", {"limit": min(max(limit, 1), 100)}, scope=settings.read_scope)
 
 
 @mcp.tool()
 async def get_campaign(campaign_id: str, ctx: Context[AppContext]) -> dict:
     """Get one SignalAI campaign by ID."""
-    return await invoke(ctx, "campaign.get", {"campaign_id": campaign_id})
+    return await invoke(ctx, "campaign.get", {"campaign_id": campaign_id}, scope=settings.read_scope)
 
 
 # Analytics
 @mcp.tool()
 async def get_analytics_overview(ctx: Context[AppContext]) -> dict:
     """Get a tenant-scoped SignalAI analytics overview for the last 30 days."""
-    return await invoke(ctx, "analytics.overview", {})
+    return await invoke(ctx, "analytics.overview", {}, scope=settings.read_scope)
 
 
 # Contacts
 @mcp.tool()
 async def list_contacts(ctx: Context[AppContext], limit: int = 50) -> dict:
     """List contacts in the authenticated SignalAI workspace."""
-    return await invoke(ctx, "contact.list", {"limit": min(max(limit, 1), 100)})
+    return await invoke(ctx, "contact.list", {"limit": min(max(limit, 1), 100)}, scope=settings.read_scope)
 
 
 @mcp.tool()
 async def get_contact(contact_id: str, ctx: Context[AppContext]) -> dict:
     """Get one SignalAI contact by ID."""
-    return await invoke(ctx, "contact.get", {"contact_id": contact_id})
+    return await invoke(ctx, "contact.get", {"contact_id": contact_id}, scope=settings.read_scope)
 
 
 # Integrations
 @mcp.tool()
 async def list_integrations(ctx: Context[AppContext], limit: int = 50) -> dict:
     """List connected SignalAI integrations for the authenticated workspace."""
-    return await invoke(ctx, "integration.list", {"limit": min(max(limit, 1), 100)})
+    return await invoke(ctx, "integration.list", {"limit": min(max(limit, 1), 100)}, scope=settings.read_scope)
 
 
 @mcp.tool()
 async def get_integration(integration_id: str, ctx: Context[AppContext]) -> dict:
     """Get one connected SignalAI integration without exposing credentials."""
-    return await invoke(ctx, "integration.get", {"integration_id": integration_id})
+    return await invoke(ctx, "integration.get", {"integration_id": integration_id}, scope=settings.read_scope)
 
 
 app = mcp.streamable_http_app(
