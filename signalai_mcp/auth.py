@@ -38,10 +38,14 @@ class ConfiguredTokenVerifier(TokenVerifier):
         entry = self._tokens.get(token)
         if not isinstance(entry, dict):
             return None
-        scopes = entry.get("scopes", [settings.required_scope])
-        if not isinstance(scopes, list) or settings.required_scope not in scopes:
+        scopes = entry.get("scopes", [settings.read_scope])
+        if (
+            not isinstance(scopes, list)
+            or not scopes
+            or any(not isinstance(scope, str) or scope not in {settings.read_scope, settings.write_scope} for scope in scopes)
+        ):
             return None
-        if not entry.get("tenant_id"):
+        if not entry.get("tenant_id") or not entry.get("sub") or not entry.get("client_id"):
             return None
         return self._access_token(token, entry, [str(scope) for scope in scopes])
 
@@ -62,15 +66,15 @@ class ConfiguredTokenVerifier(TokenVerifier):
         except (httpx.HTTPError, ValueError):
             return None
 
-        if not body.get("active") or not body.get("tenant_id"):
+        if not body.get("active") or not body.get("tenant_id") or not body.get("sub") or not body.get("client_id"):
             return None
         scope_text = body.get("scope", "")
         scopes = scope_text.split() if isinstance(scope_text, str) else list(scope_text or [])
-        if settings.required_scope not in scopes:
+        if not scopes or any(scope not in {settings.read_scope, settings.write_scope} for scope in scopes):
             return None
 
         issuer = body.get("iss")
-        if issuer is not None and self._canonical_url(issuer) != self._canonical_url(settings.auth_issuer_url):
+        if not isinstance(issuer, str) or self._canonical_url(issuer) != self._canonical_url(settings.auth_issuer_url):
             return None
 
         expected_resource = self._canonical_url(settings.public_url)
@@ -80,6 +84,9 @@ class ConfiguredTokenVerifier(TokenVerifier):
         else:
             audience_values = [self._canonical_url(audience)] if audience else []
         if expected_resource not in audience_values:
+            return None
+        expires_at = body.get("exp")
+        if not isinstance(expires_at, (int, float)) or expires_at <= 0:
             return None
 
         return self._access_token(token, body, [str(scope) for scope in scopes])
