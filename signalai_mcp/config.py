@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     auth_client_id: str | None = None
     auth_client_secret: str | None = None
     auth_tokens: str | None = None
-    required_scope: str = "signalai:read"
+    required_scope: str = "signalai:read"  # Retained for backward-compatible config.
+    read_scope: str = "signalai:read"
+    write_scope: str = "signalai:write"
     capability_base_url: AnyHttpUrl = "http://signalai-server:3000"
     capability_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     service_token: str | None = None
