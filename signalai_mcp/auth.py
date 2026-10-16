@@ -38,8 +38,12 @@ class ConfiguredTokenVerifier(TokenVerifier):
         entry = self._tokens.get(token)
         if not isinstance(entry, dict):
             return None
-        scopes = entry.get("scopes", [settings.required_scope])
-        if not isinstance(scopes, list) or settings.required_scope not in scopes:
+        scopes = entry.get("scopes", [settings.read_scope])
+        if (
+            not isinstance(scopes, list)
+            or not scopes
+            or any(not isinstance(scope, str) or scope not in {settings.read_scope, settings.write_scope} for scope in scopes)
+        ):
             return None
         if not entry.get("tenant_id"):
             return None
@@ -66,7 +70,7 @@ class ConfiguredTokenVerifier(TokenVerifier):
             return None
         scope_text = body.get("scope", "")
         scopes = scope_text.split() if isinstance(scope_text, str) else list(scope_text or [])
-        if settings.required_scope not in scopes:
+        if not scopes or any(scope not in {settings.read_scope, settings.write_scope} for scope in scopes):
             return None
 
         issuer = body.get("iss")
