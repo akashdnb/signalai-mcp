@@ -117,3 +117,33 @@ async def test_capability_client_normalizes_structured_conflict(monkeypatch):
         assert result["recovery"] == "reread_automation"
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_capability_client_normalizes_unexpected_upstream_404(monkeypatch):
+    """A stale/unsupported capability must not become an MCP tool exception."""
+    monkeypatch.setattr(settings, "service_token", "service-secret")
+    monkeypatch.setattr(settings, "capability_base_url", "http://signalai-server:3000")
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "capability_unavailable", "code": "capability_unavailable"})
+
+    client = CapabilityClient()
+    await client.close()
+    client._client = httpx.AsyncClient(
+        base_url=str(settings.capability_base_url).rstrip("/"),
+        transport=httpx.MockTransport(handler),
+        timeout=httpx.Timeout(settings.capability_timeout_seconds),
+    )
+    try:
+        result = await client.invoke(
+            "unsupported.capability", tenant_id="tenant-123", correlation_id="corr-456", input={},
+        )
+        assert result == {
+            "error": "capability_unavailable",
+            "code": "capability_unavailable",
+            "message": "The capability request was rejected.",
+            "correlationId": "corr-456",
+        }
+    finally:
+        await client.close()

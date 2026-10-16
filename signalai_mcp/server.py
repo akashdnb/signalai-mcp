@@ -51,7 +51,6 @@ mcp = MCPServer(
     auth=AuthSettings(
         issuer_url=AnyHttpUrl(oauth_issuer_url()),
         resource_server_url=AnyHttpUrl(resource_server_url()),
-        # Scope is enforced per tool so read-only tokens remain supported.
         required_scopes=[],
         validate_token_resource=True,
     ),
@@ -93,13 +92,12 @@ def require_tool_scope(scope: str) -> tuple[str, str, str]:
     return identity
 
 
-
-
 def idempotency_key(value: str | None) -> str:
     key = (value or "").strip()
     if not key or len(key) > 200:
         raise ValueError("idempotency_key_invalid")
     return key
+
 
 async def invoke(
     ctx: Context[AppContext],
@@ -126,14 +124,6 @@ async def invoke(
 @mcp.custom_route("/health", methods=["GET"])
 async def health(_request: Request) -> Response:
     return JSONResponse({"status": "ok", "service": settings.service_name})
-
-
-# Existing company lookup is retained for the separate prospecting/enrichment
-# surface. It is not part of the core client CRM toolset below.
-@mcp.tool()
-async def get_company(company_id: str, ctx: Context[AppContext]) -> dict:
-    """Get a company visible to the authenticated SignalAI workspace."""
-    return await invoke(ctx, "company.get", {"company_id": company_id}, scope=settings.read_scope)
 
 
 # Leads
